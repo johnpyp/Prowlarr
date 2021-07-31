@@ -7,36 +7,37 @@ using NzbDrone.Common.Cache;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Common.Http;
 using NzbDrone.Common.Serializer;
+using NzbDrone.Core.ThingiProvider;
 
 namespace NzbDrone.Core.Indexers.Newznab
 {
     public interface INewznabCapabilitiesProvider
     {
-        IndexerCapabilities GetCapabilities(NewznabSettings settings);
+        IndexerCapabilities GetCapabilities(NewznabSettings settings, ProviderDefinition definition);
     }
 
     public class NewznabCapabilitiesProvider : INewznabCapabilitiesProvider
     {
         private readonly ICached<IndexerCapabilities> _capabilitiesCache;
-        private readonly IHttpClient _httpClient;
+        private readonly IIndexerHttpClient _httpClient;
         private readonly Logger _logger;
 
-        public NewznabCapabilitiesProvider(ICacheManager cacheManager, IHttpClient httpClient, Logger logger)
+        public NewznabCapabilitiesProvider(ICacheManager cacheManager, IIndexerHttpClient httpClient, Logger logger)
         {
             _capabilitiesCache = cacheManager.GetCache<IndexerCapabilities>(GetType());
             _httpClient = httpClient;
             _logger = logger;
         }
 
-        public IndexerCapabilities GetCapabilities(NewznabSettings indexerSettings)
+        public IndexerCapabilities GetCapabilities(NewznabSettings indexerSettings, ProviderDefinition definition)
         {
             var key = indexerSettings.ToJson();
-            var capabilities = _capabilitiesCache.Get(key, () => FetchCapabilities(indexerSettings), TimeSpan.FromDays(7));
+            var capabilities = _capabilitiesCache.Get(key, () => FetchCapabilities(indexerSettings, definition), TimeSpan.FromDays(7));
 
             return capabilities;
         }
 
-        private IndexerCapabilities FetchCapabilities(NewznabSettings indexerSettings)
+        private IndexerCapabilities FetchCapabilities(NewznabSettings indexerSettings, ProviderDefinition definition)
         {
             var capabilities = new IndexerCapabilities();
 
@@ -54,7 +55,7 @@ namespace NzbDrone.Core.Indexers.Newznab
 
             try
             {
-                response = _httpClient.Get(request);
+                response = _httpClient.Get(request, definition);
             }
             catch (Exception ex)
             {
