@@ -55,12 +55,12 @@ namespace NzbDrone.Core.Applications.Readarr
             return new ValidationResult(failures);
         }
 
-        public override Dictionary<int, int> GetIndexerMappings()
+        public override Dictionary<string, int> GetIndexerMappings()
         {
             var indexers = _readarrV1Proxy.GetIndexers(Settings)
                                           .Where(i => i.Implementation == "Newznab" || i.Implementation == "Torznab");
 
-            var mappings = new Dictionary<int, int>();
+            var mappings = new Dictionary<string, int>();
 
             foreach (var indexer in indexers)
             {
@@ -71,7 +71,7 @@ namespace NzbDrone.Core.Applications.Readarr
                     if (match.Groups["indexer"].Success && int.TryParse(match.Groups["indexer"].Value, out var indexerId))
                     {
                         //Add parsed mapping if it's mapped to a Indexer in this Prowlarr instance
-                        mappings.Add(indexer.Id, indexerId);
+                        mappings.Add(indexer.Id.ToString(), indexerId);
                     }
                 }
             }
@@ -86,7 +86,7 @@ namespace NzbDrone.Core.Applications.Readarr
                 var readarrIndexer = BuildReadarrIndexer(indexer, indexer.Protocol);
 
                 var remoteIndexer = _readarrV1Proxy.AddIndexer(readarrIndexer, Settings);
-                _appIndexerMapService.Insert(new AppIndexerMap { AppId = Definition.Id, IndexerId = indexer.Id, RemoteIndexerId = remoteIndexer.Id });
+                _appIndexerMapService.Insert(new AppIndexerMap { AppId = Definition.Id, IndexerId = indexer.Id, RemoteIndexerId = remoteIndexer.Id.ToString() });
             }
         }
 
@@ -99,7 +99,7 @@ namespace NzbDrone.Core.Applications.Readarr
             if (indexerMapping != null)
             {
                 //Remove Indexer remotely and then remove the mapping
-                _readarrV1Proxy.RemoveIndexer(indexerMapping.RemoteIndexerId, Settings);
+                _readarrV1Proxy.RemoveIndexer(int.Parse(indexerMapping.RemoteIndexerId), Settings);
                 _appIndexerMapService.Delete(indexerMapping.Id);
             }
         }
@@ -111,9 +111,11 @@ namespace NzbDrone.Core.Applications.Readarr
             var appMappings = _appIndexerMapService.GetMappingsForApp(Definition.Id);
             var indexerMapping = appMappings.FirstOrDefault(m => m.IndexerId == indexer.Id);
 
-            var readarrIndexer = BuildReadarrIndexer(indexer, indexer.Protocol, indexerMapping?.RemoteIndexerId ?? 0);
+            var remoteId = int.Parse(indexerMapping?.RemoteIndexerId ?? "0");
 
-            var remoteIndexer = _readarrV1Proxy.GetIndexer(indexerMapping.RemoteIndexerId, Settings);
+            var readarrIndexer = BuildReadarrIndexer(indexer, indexer.Protocol, remoteId);
+
+            var remoteIndexer = _readarrV1Proxy.GetIndexer(remoteId, Settings);
 
             if (remoteIndexer != null)
             {
@@ -133,7 +135,7 @@ namespace NzbDrone.Core.Applications.Readarr
                     _logger.Debug("Remote indexer not found, re-adding {0} to Readarr", indexer.Name);
                     readarrIndexer.Id = 0;
                     var newRemoteIndexer = _readarrV1Proxy.AddIndexer(readarrIndexer, Settings);
-                    _appIndexerMapService.Insert(new AppIndexerMap { AppId = Definition.Id, IndexerId = indexer.Id, RemoteIndexerId = newRemoteIndexer.Id });
+                    _appIndexerMapService.Insert(new AppIndexerMap { AppId = Definition.Id, IndexerId = indexer.Id, RemoteIndexerId = newRemoteIndexer.Id.ToString() });
                 }
                 else
                 {

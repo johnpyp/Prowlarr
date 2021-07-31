@@ -62,6 +62,8 @@ namespace NzbDrone.Core.Applications
         {
             var enabledApps = _applicationsFactory.SyncEnabled();
 
+            _indexerFactory.Get(message.ProviderId);
+
             foreach (var app in enabledApps)
             {
                 ExecuteAction(a => a.RemoveIndexer(message.ProviderId), app);
